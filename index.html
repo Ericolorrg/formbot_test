@@ -19,36 +19,7 @@
         document.body.style.color = themeParams.text_color || "#FFF";
         Telegram.WebApp.setBackgroundColor(themeParams.bottom_bar_color || "#000");
 
-        const CloudStorage = (function() {
-            var cloudStorage = {};
-
-            function invokeStorageMethod(method, params, callback) {
-                invokeCustomMethod(method, params, callback);
-            }
-
-            cloudStorage.setItem = function(key, value, callback) {
-                return invokeStorageMethod('saveStorageValue', {key: key, value: value}, callback);
-            };
-            cloudStorage.getItem = function(key, callback) {
-                return cloudStorage.getItems([key], callback ? function(err, res) {
-                    if (err) callback(err);
-                    else callback(null, res[key]);
-                } : null);
-            };
-            cloudStorage.getItems = function(keys, callback) {
-                return invokeStorageMethod('getStorageValues', {keys: keys}, callback);
-            };
-            cloudStorage.removeItem = function(key, callback) {
-                return cloudStorage.removeItems([key], callback);
-            };
-            cloudStorage.removeItems = function(keys, callback) {
-                return invokeStorageMethod('deleteStorageValues', {keys: keys}, callback);
-            };
-            cloudStorage.getKeys = function(callback) {
-                return invokeStorageMethod('getStorageKeys', {}, callback);
-            };
-            return cloudStorage;
-        })();
+        const CloudStorage = useWebAppCloudStorage();
 
         const configurations = [];
         let configCount = 0;
@@ -75,21 +46,17 @@
         });
 
         function deleteConfig(id) {
-            const keys = [
-                `product_${id}`,
-                `url1_${id}`,
-                `url2_${id}`,
-                `url3_${id}`,
-                `discount_${id}`,
-                `minPrice_${id}`,
-                `action_${id}`
-            ];
+            const key = `config_${id}`;
 
             if (confirm('Вы уверены, что хотите удалить эту конфигурацию?')) {
-                keys.forEach(key => {
-                    CloudStorage.removeItem(key);
+                CloudStorage.removeStorageItem(key).then((success, err) => {
+                    if(success && !err) {
+                        console.log('Конфигурация удалена:', key);
+                        document.getElementById(`config_${id}`).remove();
+                    } else {
+                        console.log(err);
+                    }
                 });
-                document.getElementById(`config_${id}`).remove();
             }
         }
 
@@ -106,18 +73,29 @@
                     action: document.getElementById(`action_${i}`).value,
                 };
                 allConfigs.push(config);
+                const key = `config_${i}`;
+                CloudStorage.setStorageItem(key, JSON.stringify(config)).then((success, err) => {
+                    if (success && !err) {
+                        console.log('Конфигурация сохранена:', key);
+                    } else {
+                        console.log(err);
+                    }
+                });
             }
-            // Здесь можно отправить allConfigs на сервер или в Telegram
             console.log('Конфигурации отправлены:', allConfigs);
         });
 
         function loadConfigs() {
-            CloudStorage.getKeys(keys => {
+            CloudStorage.getKeys().then(keys => {
                 keys.forEach(key => {
-                    CloudStorage.getItem(key, (err, value) => {
-                        if (!err) {
-                            // Здесь можно восстановить значения в интерфейсе
-                            console.log(`Ключ: ${key}, Значение: ${value}`);
+                    CloudStorage.getStorageItem(key).then((data, err) => {
+                        if(data && !err) {
+                            const config = JSON.parse(data);
+                            // Восстановите значения в интерфейсе
+                            console.log(`Ключ: ${key}, Значение:`, config);
+                            // Добавьте логику для отображения конфигурации в интерфейсе
+                        } else {
+                            console.log(err);
                         }
                     });
                 });
